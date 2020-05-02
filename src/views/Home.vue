@@ -1,5 +1,5 @@
 <template>
-  <v-container fluid class="timetable-bg">
+  <v-container fluid class="timetable">
     <v-row justify="center" :align="'center'" class="timetable">
       <v-col cols="12" sm="11" md="8" lg="6">
         <v-card v-if="has_actual_task" elevation="6" class="pa-3">
@@ -120,9 +120,9 @@
       <v-card class="pa-4">
         <v-card-title class="mb-3 pl-0">Добавление задачи</v-card-title>
 
-        <v-form>
-          <v-text-field solo v-model="new_task.title" label="Название задачи" ></v-text-field>
-          <v-textarea solo v-model="new_task.text" label="Текст задачи"></v-textarea>
+        <v-form v-if="activators.add_task">
+          <v-text-field solo v-model="new_task.title" placeholder="Название задачи"></v-text-field>
+          <v-textarea solo v-model="new_task.text" placeholder="Текст задачи"></v-textarea>
         </v-form>
 
         <v-card-actions>
@@ -143,6 +143,7 @@
 
 <script>
 import draggable from 'vuedraggable'
+import {get, set} from 'idb-keyval'
 
 const min40 = 2400000;
 
@@ -165,19 +166,30 @@ export default {
         text: '',
         time: min40
       },
+      actual_task: {
+
+      },
       task_list: [],
       refresh_token: 1,
     }
   },
+  async created () {
+    let val = await get('task_list');
+    if (typeof val !== 'undefined' || val.length === 0){
+      this.task_list = val;
+      this.actual_task = this.task_list[0];
+    }
+
+  },
   computed: {
-    get_actual_task: ({task_list}) => {
-      return task_list[0];
+    get_actual_task: ({actual_task}) => {
+      return actual_task;
     },
     has_actual_task: ({task_list}) => {
       return task_list.length > 0
     },
-    get_left_time ({task_list, refresh_token}) {
-      return task_list[0].time + refresh_token;
+    get_left_time ({actual_task, refresh_token}) {
+      return actual_task.time + refresh_token;
     }
   },
   methods: {
@@ -192,9 +204,11 @@ export default {
       this.new_task.title = '';
       this.new_task.text = '';
       this.activators.add_task = false;
+      this.update_actual_task();
     },
     delete_task (index) {
       this.task_list.splice(index, 1);
+      this.update_actual_task();
     },
     to_end_task () {
       let task = {
@@ -202,10 +216,25 @@ export default {
       };
       this.delete_task(0);
       this.task_list.push(task);
+      this.update_actual_task();
       this.refresh_countdown();
     },
+    update_actual_task () {
+      let task = {
+        ...this.task_list[0]
+      };
+      this.actual_task = task;
+      set('task_list', this.task_list);
+    },
     update_time_task () {
-      this.refresh_countdown();
+
+      if (!(this.actual_task.title === this.task_list[0].title && this.actual_task.text === this.task_list[0].text)) {
+        this.update_actual_task();
+        this.refresh_countdown();
+      }
+      else {
+          set('task_list', this.task_list);
+      }
     }
   },
   mounted() {
@@ -216,7 +245,7 @@ export default {
 
 <style scope lang="scss">
   .timetable {
-    height: 100vh;
+    height: 100%;
     background: url('../assets/logo.png');
   }
   .bg {
