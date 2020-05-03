@@ -2,12 +2,22 @@
   <v-container fluid class="timetable">
     <v-row justify="center" :align="'center'" class="timetable">
       <v-col cols="12" sm="11" md="8" lg="6">
-        <v-card v-if="has_actual_task" elevation="6" class="pa-3">
+        <v-card elevation="6" class="pa-3">
           <v-card-title class="headline">
-            {{ get_actual_task.title }}
+
+            <template v-if="has_actual_task">
+              {{ get_actual_task.title }}
+            </template>
+
+            <template v-else>
+              <v-spacer></v-spacer>
+              Нет задач
+            </template>
+
+
             <v-spacer></v-spacer>
-            <v-card-subtitle class="mt-1">
-              <countdown :refresh="refresh_token" ref="countdown" :time="get_left_time" :emit-events="true" @start="activators.end_time = false" @end="activators.end_time = true">
+            <v-card-subtitle v-show="has_actual_task" class="mt-1">
+              <countdown ref="countdown" :time="get_left_time" :emit-events="true" @start="activators.end_time = false" @progress="actual_task.passed += 1" @end="activators.end_time = true">
                 <template v-if="!activators.end_time" slot-scope="props">{{ props.minutes }}:{{ props.seconds }}</template>
 
               </countdown>
@@ -15,51 +25,65 @@
                 BLITZ!
               </template>
             </v-card-subtitle>
+
           </v-card-title>
 
-          <v-card-text>
-            {{ get_actual_task.text }}
-          </v-card-text>
-          <v-bottom-navigation v-if="activators.end_time" class="elevation-0 mt-8 mb-8">
-            <v-btn @click="to_end_task">
-              <span>В очередь</span>
-              <v-icon>mdi-alarm-snooze</v-icon>
-            </v-btn>
-            <v-btn @click="update_time_task">
-              <span>Продолжить</span>
-              <v-icon>mdi-alarm-plus</v-icon>
-            </v-btn>
-            <v-btn icon @click="delete_task(0)">
-              <span class="green--text text--darken-2">Готово</span>
-              <v-icon class="green--text text--darken-2">mdi-alarm-check</v-icon>
-            </v-btn>
-          </v-bottom-navigation>
-        </v-card>
-        <v-card v-else>
-          <v-card-title>
-            <v-spacer></v-spacer>Нет задач<v-spacer></v-spacer>
-          </v-card-title>
-          <v-card-actions>
-            <v-spacer></v-spacer>
-              <v-btn
-                x-large
-                color="black"
-                text
-                elevation="4"
-                class="ma-8"
-                @click="activators.add_task = true"
-              >
-                <v-icon class="mr-2">mdi-notebook</v-icon>
-                Создать новую!
+
+          <template v-if="has_actual_task">
+
+            <v-card-text>
+              {{ get_actual_task.text }}
+            </v-card-text>
+
+
+            <v-bottom-navigation v-if="activators.end_time" class="elevation-0 mt-8 mb-8">
+              <v-btn @click="to_end_task">
+                <span>В очередь</span>
+                <v-icon>mdi-alarm-snooze</v-icon>
               </v-btn>
-            <v-spacer></v-spacer>
+              <v-btn @click="refresh_countdown">
+                <span>Продолжить</span>
+                <v-icon>mdi-alarm-plus</v-icon>
+              </v-btn>
+              <v-btn icon @click="delete_task(0)">
+                <span class="green--text text--darken-2">Готово</span>
+                <v-icon class="green--text text--darken-2">mdi-alarm-check</v-icon>
+              </v-btn>
+            </v-bottom-navigation>
 
-          </v-card-actions>
+
+            <v-slider v-else v-model="actual_task.passed" min="0" max="10" append-icon="mdi-alarm" class="ml-3 mr-3" color="black" track-color="grey">
+
+            </v-slider>
+
+          </template>
+
+          <template v-else>
+            <v-card-actions>
+              <v-spacer></v-spacer>
+                <v-btn
+                  x-large
+                  color="black"
+                  text
+                  elevation="4"
+                  class="ma-8"
+                  @click.stop="activators.add_task = true"
+                >
+                  <v-icon class="mr-2">mdi-notebook</v-icon>
+                  Создать новую!
+                </v-btn>
+              <v-spacer></v-spacer>
+
+            </v-card-actions>
+          </template>
+
+
+
         </v-card>
-
       </v-col>
-
     </v-row>
+
+
     <v-fab-transition>
       <v-btn
         color="black"
@@ -76,6 +100,8 @@
         <v-icon>mdi-plus</v-icon>
       </v-btn>
     </v-fab-transition>
+
+
     <v-bottom-sheet v-model="activators.setting" fullscreen class="bg">
       <v-sheet class="bg">
         <v-btn
@@ -95,7 +121,8 @@
         <v-row justify="center">
           <v-col cols="8">
             <v-list v-if="task_list.length > 0">
-              <draggable v-model="task_list" @change="update_time_task">
+
+              <draggable v-model="task_list" @change="update_task">
                   <v-list-item v-for="(task, index) in task_list" :key="task.title" class="elevation-1 mt-2">
                     {{ task.title }}
                     <v-spacer></v-spacer>
@@ -106,12 +133,13 @@
 
             </v-list>
             <v-alert v-else>Задач нет</v-alert>
-            <v-btn class="mt-4" @click="activators.add_task = true"><v-icon>mdi-plus</v-icon>Добавить</v-btn>
+            <v-btn class="mt-4" @click.stop="activators.add_task = true"><v-icon>mdi-plus</v-icon>Добавить</v-btn>
           </v-col>
         </v-row>
 
       </v-sheet>
     </v-bottom-sheet>
+
 
     <v-dialog
       v-model="activators.add_task"
@@ -145,7 +173,7 @@
 import draggable from 'vuedraggable'
 import {get, set} from 'idb-keyval'
 
-const min40 = 2400000;
+const min40 = 10002; //2400002
 
 export default {
   name: 'Home',
@@ -167,19 +195,21 @@ export default {
         time: min40
       },
       actual_task: {
-
+        title: '',
+        text: '',
+        time: min40,
+        passed: 0
       },
       task_list: [],
-      refresh_token: 1,
+      refresh: 1,
     }
   },
   async created () {
     let val = await get('task_list');
-    if (typeof val !== 'undefined' || val.length === 0){
+    if (typeof val !== 'undefined' && val.length === 0){
       this.task_list = val;
-      this.actual_task = this.task_list[0];
+      this.update_task();
     }
-
   },
   computed: {
     get_actual_task: ({actual_task}) => {
@@ -188,57 +218,56 @@ export default {
     has_actual_task: ({task_list}) => {
       return task_list.length > 0
     },
-    get_left_time ({actual_task, refresh_token}) {
-      return actual_task.time + refresh_token;
+    get_left_time ({actual_task, refresh}) {
+      return actual_task.time + refresh;
     }
   },
   methods: {
+
     refresh_countdown (){
-      this.refresh_token = -1 * this.refresh_token;
+      this.actual_task.passed = 0;
+      this.refresh = (-1) * this.refresh;
     },
+
     add_task () {
       let task = {
         ...this.new_task
       };
+
       this.task_list.push(task);
       this.new_task.title = '';
       this.new_task.text = '';
       this.activators.add_task = false;
-      this.update_actual_task();
+      this.update_task();
     },
+
     delete_task (index) {
       this.task_list.splice(index, 1);
-      this.update_actual_task();
+      this.update_task();
     },
+
     to_end_task () {
       let task = {
         ...this.task_list[0]
       };
-      this.delete_task(0);
+      this.task_list.splice(0, 1);
       this.task_list.push(task);
-      this.update_actual_task();
-      this.refresh_countdown();
+      this.update_task();
     },
-    update_actual_task () {
-      let task = {
-        ...this.task_list[0]
-      };
-      this.actual_task = task;
-      set('task_list', this.task_list);
-    },
-    update_time_task () {
 
+    update_task () {
       if (!(this.actual_task.title === this.task_list[0].title && this.actual_task.text === this.task_list[0].text)) {
-        this.update_actual_task();
+        let task = {
+          passed: 0,
+          ...this.task_list[0]
+        };
+        this.actual_task = task;
         this.refresh_countdown();
       }
-      else {
-          set('task_list', this.task_list);
-      }
+      set('task_list', this.task_list);
     }
   },
-  mounted() {
-  },
+
 }
 </script>
 
