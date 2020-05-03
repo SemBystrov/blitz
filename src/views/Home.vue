@@ -282,7 +282,6 @@ export default {
       }
       this.done_task_list.unshift(done_task);
       this.delete_task(0);
-      console.log(this.done_task_list);
     },
 
     to_end_task () {
